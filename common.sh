@@ -52,6 +52,24 @@ submodule_exists() {
   echo 0
 }
 
+submodule_url_from_path() {
+  local -r name="$1"
+  local -r top_level="$(git rev-parse --show-toplevel)"
+  local -r dir_name="$(basename "$(pwd)")"
+  local -r target_path="${dir_name}/${name}"
+  local path_key=""
+  local submodule_name=""
+
+  path_key=$(git config -f "${top_level}/.gitmodules" --get-regexp '^submodule\..*\.path$' | awk -v p="${target_path}" '$2 == p {print $1; exit}')
+  if [ -z "${path_key}" ]; then
+    return 1
+  fi
+
+  submodule_name="${path_key#submodule.}"
+  submodule_name="${submodule_name%.path}"
+  git config -f "${top_level}/.gitmodules" --get "submodule.${submodule_name}.url"
+}
+
 submodule_reset() {
   local -r name="$1"
   local -r branch="$2"
@@ -104,10 +122,19 @@ submodule_reset() {
 submodule_initialize() {
   local -r name="$1"
   local -r branch="$2"
+  local submodule_url=""
 
   submodule_reset "${name}" "${branch}"
 
-  git submodule update --init --recursive "${name}"
+  if ! git submodule update --init --recursive "${name}"; then
+    submodule_url=$(submodule_url_from_path "${name}" || true)
+    if [ -z "${submodule_url}" ]; then
+      echo "Failed to initialize submodule ${name}, and no URL could be resolved from .gitmodules."
+      return 1
+    fi
+    echo "Submodule ${name} failed to initialize at recorded gitlink; falling back to ${branch} from ${submodule_url}."
+    submodule_update "${name}" "${branch}" "${submodule_url}"
+  fi
 
   # Check for patch file
   if [ -f "patches/${name}.patch" ]; then
@@ -122,14 +149,19 @@ submodule_update() {
   local -r branch="$2"
   local -r url="$3"
   local target_ref=""
+  local exists=0
 
-  if ! git submodule set-url "${name}" "${url}" >/dev/null 2>&1; then
-    if ! git submodule add -f -b "${branch}" "${url}" "${name}"; then
-      git submodule add -f "${url}" "${name}"
-    fi
+  exists=$(submodule_exists "${name}")
+  if [ "${exists}" = "0" ]; then
+    git submodule update --init --recursive "${name}" || true
   fi
 
-  git submodule update --init --recursive "${name}"
+  if [ ! -d "${name}/.git" ] && [ ! -f "${name}/.git" ]; then
+    rm -rf "${name}"
+    git clone "${url}" "${name}"
+  fi
+
+  git submodule set-url "${name}" "${url}" >/dev/null 2>&1 || true
 
   pushd "${name}"
   git remote set-url origin "${url}"
