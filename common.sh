@@ -181,14 +181,32 @@ submodule_update() {
   git remote set-url origin "${url}"
   if git ls-remote --exit-code --heads origin "${branch}" >/dev/null 2>&1; then
     git fetch origin "${branch}"
-    target_ref="FETCH_HEAD"
+    if git rev-parse --verify --quiet "FETCH_HEAD^{commit}" >/dev/null 2>&1; then
+      target_ref="FETCH_HEAD"
+    else
+      echo "Fetched branch ref ${branch} did not resolve to a commit for submodule ${name}."
+      popd
+      return 1
+    fi
   elif git ls-remote --exit-code --tags origin "refs/tags/${branch}" >/dev/null 2>&1; then
     git fetch origin "refs/tags/${branch}:refs/tags/${branch}" >/dev/null 2>&1
-    target_ref="refs/tags/${branch}"
+    if git rev-parse --verify --quiet "refs/tags/${branch}^{commit}" >/dev/null 2>&1; then
+      target_ref="refs/tags/${branch}"
+    else
+      echo "Fetched tag ref ${branch} did not resolve to a commit for submodule ${name}."
+      popd
+      return 1
+    fi
   else
     if [[ "${branch}" == refs/* ]]; then
       git fetch origin "${branch}"
-      target_ref="FETCH_HEAD"
+      if git rev-parse --verify --quiet "FETCH_HEAD^{commit}" >/dev/null 2>&1; then
+        target_ref="FETCH_HEAD"
+      else
+        echo "Fetched ref ${branch} did not resolve to a commit for submodule ${name}."
+        popd
+        return 1
+      fi
     else
       echo "Submodule ${name} ref ${branch} was not found as a remote branch or tag on ${url}."
       popd
