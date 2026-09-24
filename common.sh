@@ -182,7 +182,7 @@ submodule_update() {
   if git ls-remote --exit-code --heads origin "${branch}" >/dev/null 2>&1; then
     git fetch origin "${branch}"
     if git rev-parse --verify --quiet "FETCH_HEAD^{commit}" >/dev/null 2>&1; then
-      target_ref="FETCH_HEAD"
+      target_ref=$(git rev-parse "FETCH_HEAD^{commit}")
     else
       echo "Fetched branch ref ${branch} did not resolve to a commit for submodule ${name}."
       popd >/dev/null
@@ -191,7 +191,7 @@ submodule_update() {
   elif git ls-remote --exit-code --tags origin "refs/tags/${branch}" >/dev/null 2>&1; then
     git fetch origin "refs/tags/${branch}:refs/tags/${branch}" >/dev/null 2>&1
     if git rev-parse --verify --quiet "refs/tags/${branch}^{commit}" >/dev/null 2>&1; then
-      target_ref="refs/tags/${branch}"
+      target_ref=$(git rev-parse "refs/tags/${branch}^{commit}")
     else
       echo "Fetched tag ref ${branch} did not resolve to a commit for submodule ${name}."
       popd >/dev/null
@@ -201,7 +201,7 @@ submodule_update() {
     if [[ "${branch}" == refs/* ]]; then
       git fetch origin "${branch}"
       if git rev-parse --verify --quiet "FETCH_HEAD^{commit}" >/dev/null 2>&1; then
-        target_ref="FETCH_HEAD"
+        target_ref=$(git rev-parse "FETCH_HEAD^{commit}")
       else
         echo "Fetched ref ${branch} did not resolve to a commit for submodule ${name}."
         popd >/dev/null
