@@ -98,6 +98,10 @@ submodule_reset() {
     git -C "${name}" checkout -- .
 
     # Reset top-level submodule to the exact recorded commit (discards any remaining changes)
+    if ! git -C "${name}" rev-parse --verify --quiet "${recorded_hash}^{commit}" >/dev/null; then
+      echo "Submodule ${name} missing recorded commit ${recorded_hash}; skipping hard reset to unavailable gitlink."
+      return 0
+    fi
     git -C "${name}" checkout -f "$recorded_hash"
     git -C "${name}" reset --hard "$recorded_hash"
 
@@ -112,8 +116,12 @@ submodule_reset() {
       git checkout -- .;
       nested_hash=$(git -C "$toplevel" rev-parse HEAD:"$sm_path" 2>/dev/null || echo "");
       if echo "$nested_hash" | grep -qE "^[0-9a-f]{40}$"; then
-        git checkout -f "$nested_hash";
-        git reset --hard "$nested_hash";
+        if git rev-parse --verify --quiet "${nested_hash}^{commit}" >/dev/null; then
+          git checkout -f "$nested_hash";
+          git reset --hard "$nested_hash";
+        else
+          echo "Skipping nested submodule reset for $sm_path; missing commit $nested_hash in local object store.";
+        fi
       fi
     '
   fi
