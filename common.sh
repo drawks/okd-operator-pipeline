@@ -121,17 +121,29 @@ submodule_update() {
   local -r name="$1"
   local -r branch="$2"
   local -r url="$3"
+  local target_ref=""
 
   if ! git submodule set-url "${name}" "${url}" >/dev/null 2>&1; then
-    git submodule add -f -b "${branch}" "${url}" "${name}"
+    if ! git submodule add -f -b "${branch}" "${url}" "${name}"; then
+      git submodule add -f "${url}" "${name}"
+    fi
   fi
 
   git submodule update --init --recursive "${name}"
 
   pushd "${name}"
   git remote set-url origin "${url}"
-  git fetch origin "${branch}"
-  git reset --hard "origin/${branch}"
+  git fetch origin "${branch}" --tags
+
+  if git show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
+    target_ref="origin/${branch}"
+  elif git show-ref --verify --quiet "refs/tags/${branch}"; then
+    target_ref="refs/tags/${branch}"
+  else
+    target_ref="FETCH_HEAD"
+  fi
+
+  git reset --hard "${target_ref}"
   popd
 }
 
