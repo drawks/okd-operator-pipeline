@@ -1,0 +1,66 @@
+name: Deploy All Operators
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_registry:
+        description: "Base registry URL used for all operators"
+        type: string
+        required: false
+        default: "quay.io/okderators"
+      update_catalog:
+        description: "Open catalog PRs for each built operator"
+        type: boolean
+        required: false
+        default: false
+      catalog_branch:
+        description: "Catalog branch when update_catalog is enabled"
+        type: string
+        required: false
+        default: "release-5.0"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  deploy:
+    name: Deploy ${{ matrix.operator }}
+    strategy:
+      fail-fast: false
+      matrix:
+        operator:
+          - acm
+          - cert-manager
+          - cluster-logging
+          - cluster-observability
+          - data-foundation
+          - dev-spaces
+          - devworkspace
+          - external-secrets
+          - gitops
+          - ingress-node-firewall
+          - kube-descheduler
+          - local-storage
+          - lvms
+          - metallb
+          - multicluster-engine
+          - network-observability
+          - nmstate
+          - node-feature-discovery
+          - oadp
+          - pf-status-relay
+          - ptp
+          - sandboxed-containers
+          - secondary-scheduler
+          - service-mesh
+          - sr-iov
+          - vertical-pod-autoscaler
+          - web-terminal
+    uses: ./.github/workflows/operator-deploy.yaml
+    with:
+      operator: ${{ matrix.operator }}
+      base_registry: ${{ inputs.base_registry }}
+      update_catalog: ${{ inputs.update_catalog }}
+      catalog_branch: ${{ inputs.catalog_branch }}
+    secrets: inherit

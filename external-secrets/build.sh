@@ -26,7 +26,7 @@ IMG_BUNDLE="${REGISTRY}/operator-bundle:${OCP_DATE}"
 init() {
     submodule_initialize operator release-${OCP_SHORT}
     submodule_initialize external-secrets release-${ES_RELEASE}
-    submodule_initialize bitwarden-sdk-server.Containerfile release-${BITWARDEN_SDK_RELEASE}
+    submodule_initialize bitwarden-sdk-server release-${BITWARDEN_SDK_RELEASE}
 }
 
 deinit() {

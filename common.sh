@@ -52,14 +52,34 @@ submodule_exists() {
   echo 0
 }
 
+submodule_url_from_path() {
+  local -r name="$1"
+  local -r top_level="$(git rev-parse --show-toplevel)"
+  local -r dir_name="$(basename "$(pwd)")"
+  local -r target_path="${dir_name}/${name}"
+  local path_key=""
+  local submodule_name=""
+
+  path_key=$(git config -f "${top_level}/.gitmodules" --get-regexp '^submodule\..*\.path$' | awk -v p="${target_path}" '$2 == p {print $1; exit}')
+  if [ -z "${path_key}" ]; then
+    return 1
+  fi
+
+  submodule_name="${path_key#submodule.}"
+  submodule_name="${submodule_name%.path}"
+  git config -f "${top_level}/.gitmodules" --get "submodule.${submodule_name}.url"
+}
+
 submodule_reset() {
   local -r name="$1"
   local -r branch="$2"
 
   # Check if the submodule exists
-  EXISTS=$(submodule_exists "${name}")
-  if [ "${EXISTS}" = "1" ]; then
+  local exists
+  exists=$(submodule_exists "${name}")
+  if [ "${exists}" = "1" ]; then
     local recorded_hash
+    local dir_name
     dir_name=$(basename "$(pwd)")
     # git rev-parse prints the failed pathspec to stdout even on error, so we
     # cannot rely on an empty-string check.  Validate that the result is an
@@ -78,6 +98,10 @@ submodule_reset() {
     git -C "${name}" checkout -- .
 
     # Reset top-level submodule to the exact recorded commit (discards any remaining changes)
+    if ! git -C "${name}" rev-parse --verify --quiet "${recorded_hash}^{commit}" >/dev/null; then
+      echo "Submodule ${name} missing recorded commit ${recorded_hash}; skipping hard reset to unavailable gitlink."
+      return 0
+    fi
     git -C "${name}" checkout -f "$recorded_hash"
     git -C "${name}" reset --hard "$recorded_hash"
 
@@ -92,8 +116,12 @@ submodule_reset() {
       git checkout -- .;
       nested_hash=$(git -C "$toplevel" rev-parse HEAD:"$sm_path" 2>/dev/null || echo "");
       if echo "$nested_hash" | grep -qE "^[0-9a-f]{40}$"; then
-        git checkout -f "$nested_hash";
-        git reset --hard "$nested_hash";
+        if git rev-parse --verify --quiet "${nested_hash}^{commit}" >/dev/null; then
+          git checkout -f "$nested_hash";
+          git reset --hard "$nested_hash";
+        else
+          echo "Skipping nested submodule reset for $sm_path; missing commit $nested_hash in local object store.";
+        fi
       fi
     '
   fi
@@ -102,14 +130,23 @@ submodule_reset() {
 submodule_initialize() {
   local -r name="$1"
   local -r branch="$2"
+  local submodule_url=""
 
   submodule_reset "${name}" "${branch}"
 
-  git submodule update --init --recursive "${name}" || true
+  if ! git submodule update --init --recursive "${name}"; then
+    submodule_url=$(submodule_url_from_path "${name}" || true)
+    if [ -z "${submodule_url}" ]; then
+      echo "Failed to initialize submodule ${name}, and no URL could be resolved from .gitmodules."
+      return 1
+    fi
+    echo "Submodule ${name} failed to initialize at recorded gitlink; falling back to ${branch} from ${submodule_url}."
+    submodule_update "${name}" "${branch}" "${submodule_url}" || return 1
+  fi
 
   # Check for patch file
   if [ -f "patches/${name}.patch" ]; then
-    pushd "${name}"
+    pushd "${name}" >/dev/null
     git am -3 "../patches/${name}.patch"
     popd
   fi
@@ -119,24 +156,67 @@ submodule_update() {
   local -r name="$1"
   local -r branch="$2"
   local -r url="$3"
+  local target_ref=""
+  local exists=0
 
-
-  EXISTS=$(submodule_exists "${name}")
-  if [ "${EXISTS}" = "1" ]; then
-    git -C "$name" clean -fdx
-    git -C "$name" fetch origin "${branch}"
-    git -C "$name" reset --hard origin/${branch}
+  exists=$(submodule_exists "${name}")
+  if [ "${exists}" = "0" ]; then
+    git submodule update --init --recursive "${name}" || true
   fi
 
-  git submodule update --init --recursive "${name}" || true
+  if [ ! -d "${name}/.git" ] && [ ! -f "${name}/.git" ]; then
+    git submodule deinit -f "${name}" >/dev/null 2>&1 || true
+    rm -rf "${name}"
+    git submodule update --init --recursive "${name}" || true
+  fi
 
-  git submodule add -f -b ${branch} ${url} ${name} || true
+  if [ ! -d "${name}/.git" ] && [ ! -f "${name}/.git" ]; then
+    echo "Failed to materialize submodule ${name} as a git repository."
+    return 1
+  fi
+
+  git submodule set-url "${name}" "${url}" >/dev/null 2>&1 || true
 
   pushd "${name}"
   git remote set-url origin "${url}"
-  git fetch origin "${branch}"
-  git reset --hard "origin/${branch}"
-  popd
+  if git ls-remote --exit-code --heads origin "${branch}" >/dev/null 2>&1; then
+    git fetch origin "${branch}"
+    if git rev-parse --verify --quiet "FETCH_HEAD^{commit}" >/dev/null 2>&1; then
+      target_ref=$(git rev-parse "FETCH_HEAD^{commit}")
+    else
+      echo "Fetched branch ref ${branch} did not resolve to a commit for submodule ${name}."
+      popd >/dev/null
+      return 1
+    fi
+  elif git ls-remote --exit-code --tags origin "refs/tags/${branch}" >/dev/null 2>&1; then
+    git fetch origin "refs/tags/${branch}:refs/tags/${branch}" >/dev/null 2>&1
+    if git rev-parse --verify --quiet "refs/tags/${branch}^{commit}" >/dev/null 2>&1; then
+      target_ref=$(git rev-parse "refs/tags/${branch}^{commit}")
+    else
+      echo "Fetched tag ref ${branch} did not resolve to a commit for submodule ${name}."
+      popd >/dev/null
+      return 1
+    fi
+  else
+    if [[ "${branch}" == refs/* ]]; then
+      git fetch origin "${branch}"
+      if git rev-parse --verify --quiet "FETCH_HEAD^{commit}" >/dev/null 2>&1; then
+        target_ref=$(git rev-parse "FETCH_HEAD^{commit}")
+      else
+        echo "Fetched ref ${branch} did not resolve to a commit for submodule ${name}."
+        popd >/dev/null
+        return 1
+      fi
+    else
+      echo "Submodule ${name} ref ${branch} was not found as a remote branch or tag on ${url}."
+      popd >/dev/null
+      return 1
+    fi
+  fi
+
+  git checkout -f "${target_ref}"
+  git reset --hard "${target_ref}"
+  popd >/dev/null
 }
 
 
