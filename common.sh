@@ -57,9 +57,11 @@ submodule_reset() {
   local -r branch="$2"
 
   # Check if the submodule exists
-  EXISTS=$(submodule_exists "${name}")
-  if [ "${EXISTS}" = "1" ]; then
+  local exists
+  exists=$(submodule_exists "${name}")
+  if [ "${exists}" = "1" ]; then
     local recorded_hash
+    local dir_name
     dir_name=$(basename "$(pwd)")
     # git rev-parse prints the failed pathspec to stdout even on error, so we
     # cannot rely on an empty-string check.  Validate that the result is an
@@ -105,7 +107,7 @@ submodule_initialize() {
 
   submodule_reset "${name}" "${branch}"
 
-  git submodule update --init --recursive "${name}" || true
+  git submodule update --init --recursive "${name}"
 
   # Check for patch file
   if [ -f "patches/${name}.patch" ]; then
@@ -120,17 +122,11 @@ submodule_update() {
   local -r branch="$2"
   local -r url="$3"
 
-
-  EXISTS=$(submodule_exists "${name}")
-  if [ "${EXISTS}" = "1" ]; then
-    git -C "$name" clean -fdx
-    git -C "$name" fetch origin "${branch}"
-    git -C "$name" reset --hard origin/${branch}
+  if ! git submodule set-url "${name}" "${url}" >/dev/null 2>&1; then
+    git submodule add -f -b "${branch}" "${url}" "${name}"
   fi
 
-  git submodule update --init --recursive "${name}" || true
-
-  git submodule add -f -b ${branch} ${url} ${name} || true
+  git submodule update --init --recursive "${name}"
 
   pushd "${name}"
   git remote set-url origin "${url}"
