@@ -214,6 +214,7 @@ submodule_update() {
     fi
   fi
 
+  git checkout -f "${target_ref}"
   git reset --hard "${target_ref}"
   popd >/dev/null
 }
