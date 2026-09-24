@@ -157,13 +157,14 @@ submodule_update() {
   fi
 
   if [ ! -d "${name}/.git" ] && [ ! -f "${name}/.git" ]; then
+    git submodule deinit -f "${name}" >/dev/null 2>&1 || true
     rm -rf "${name}"
-    if ! git submodule add -f -b "${branch}" "${url}" "${name}"; then
-      git rm -f "${name}" >/dev/null 2>&1 || true
-      if ! git submodule add -f -b "${branch}" "${url}" "${name}"; then
-        git submodule add -f "${url}" "${name}"
-      fi
-    fi
+    git submodule update --init --recursive "${name}" || true
+  fi
+
+  if [ ! -d "${name}/.git" ] && [ ! -f "${name}/.git" ]; then
+    echo "Failed to materialize submodule ${name} as a git repository."
+    return 1
   fi
 
   git submodule set-url "${name}" "${url}" >/dev/null 2>&1 || true
