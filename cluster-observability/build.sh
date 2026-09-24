@@ -34,18 +34,18 @@ IMG_BUNDLE="${REGISTRY}/operator-bundle:${OCP_DATE}"
 ## Functions
 
 init() {
-    submodule_initialize operator release-${OCP_SHORT}
-    submodule_initialize manifests release-${OCP_SHORT}
+    submodule_initialize operator release-${MAJOR}.${MINOR}
+    submodule_initialize manifests release-${MAJOR}.${MINOR}
 }
 
 deinit() {
-    submodule_reset operator release-${OCP_SHORT}
-    submodule_reset manifests release-${OCP_SHORT}
+    submodule_reset operator release-${MAJOR}.${MINOR}
+    submodule_reset manifests release-${MAJOR}.${MINOR}
 }
 
 update() {
-    submodule_update operator release-${OCP_SHORT} https://github.com/rhobs/observability-operator
-    submodule_update manifests release-${OCP_SHORT} https://github.com/rhobs/konflux-coo
+    submodule_update operator release-${MAJOR}.${MINOR} https://github.com/rhobs/observability-operator
+    submodule_update manifests release-${MAJOR}.${MINOR} https://github.com/rhobs/konflux-coo
 }
 
 build_containers() {
