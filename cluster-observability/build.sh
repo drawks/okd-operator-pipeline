@@ -4,6 +4,7 @@
 NAMESPACE="cluster-observability"
 MAJOR=1
 MINOR=2
+COO_BRANCH="release-1.2"
 
 source ../common.sh
 
@@ -34,18 +35,18 @@ IMG_BUNDLE="${REGISTRY}/operator-bundle:${OCP_DATE}"
 ## Functions
 
 init() {
-    submodule_initialize operator release-${MAJOR}.${MINOR}
-    submodule_initialize manifests release-${MAJOR}.${MINOR}
+    submodule_initialize operator ${COO_BRANCH}
+    submodule_initialize manifests ${COO_BRANCH}
 }
 
 deinit() {
-    submodule_reset operator release-${MAJOR}.${MINOR}
-    submodule_reset manifests release-${MAJOR}.${MINOR}
+    submodule_reset operator ${COO_BRANCH}
+    submodule_reset manifests ${COO_BRANCH}
 }
 
 update() {
-    submodule_update operator release-${MAJOR}.${MINOR} https://github.com/rhobs/observability-operator
-    submodule_update manifests release-${MAJOR}.${MINOR} https://github.com/rhobs/konflux-coo
+    submodule_update operator ${COO_BRANCH} https://github.com/rhobs/observability-operator
+    submodule_update manifests ${COO_BRANCH} https://github.com/rhobs/konflux-coo
 }
 
 build_containers() {
