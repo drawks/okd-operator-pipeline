@@ -146,7 +146,7 @@ submodule_initialize() {
 
   # Check for patch file
   if [ -f "patches/${name}.patch" ]; then
-    pushd "${name}"
+    pushd "${name}" >/dev/null
     git am -3 "../patches/${name}.patch"
     popd
   fi
@@ -185,7 +185,7 @@ submodule_update() {
       target_ref="FETCH_HEAD"
     else
       echo "Fetched branch ref ${branch} did not resolve to a commit for submodule ${name}."
-      popd
+      popd >/dev/null
       return 1
     fi
   elif git ls-remote --exit-code --tags origin "refs/tags/${branch}" >/dev/null 2>&1; then
@@ -194,7 +194,7 @@ submodule_update() {
       target_ref="refs/tags/${branch}"
     else
       echo "Fetched tag ref ${branch} did not resolve to a commit for submodule ${name}."
-      popd
+      popd >/dev/null
       return 1
     fi
   else
@@ -204,18 +204,18 @@ submodule_update() {
         target_ref="FETCH_HEAD"
       else
         echo "Fetched ref ${branch} did not resolve to a commit for submodule ${name}."
-        popd
+        popd >/dev/null
         return 1
       fi
     else
       echo "Submodule ${name} ref ${branch} was not found as a remote branch or tag on ${url}."
-      popd
+      popd >/dev/null
       return 1
     fi
   fi
 
   git reset --hard "${target_ref}"
-  popd
+  popd >/dev/null
 }
 
 
