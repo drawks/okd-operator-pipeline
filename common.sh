@@ -158,7 +158,12 @@ submodule_update() {
 
   if [ ! -d "${name}/.git" ] && [ ! -f "${name}/.git" ]; then
     rm -rf "${name}"
-    git clone "${url}" "${name}"
+    if ! git submodule add -f -b "${branch}" "${url}" "${name}"; then
+      git rm -f "${name}" >/dev/null 2>&1 || true
+      if ! git submodule add -f -b "${branch}" "${url}" "${name}"; then
+        git submodule add -f "${url}" "${name}"
+      fi
+    fi
   fi
 
   git submodule set-url "${name}" "${url}" >/dev/null 2>&1 || true
