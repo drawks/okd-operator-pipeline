@@ -141,7 +141,7 @@ submodule_initialize() {
       return 1
     fi
     echo "Submodule ${name} failed to initialize at recorded gitlink; falling back to ${branch} from ${submodule_url}."
-    submodule_update "${name}" "${branch}" "${submodule_url}"
+    submodule_update "${name}" "${branch}" "${submodule_url}" || return 1
   fi
 
   # Check for patch file
@@ -180,14 +180,14 @@ submodule_update() {
   pushd "${name}"
   git remote set-url origin "${url}"
   if git ls-remote --exit-code --heads origin "${branch}" >/dev/null 2>&1; then
-    git fetch origin "${branch}" --tags
+    git fetch origin "${branch}"
     target_ref="FETCH_HEAD"
   elif git ls-remote --exit-code --tags origin "refs/tags/${branch}" >/dev/null 2>&1; then
-    git fetch origin "refs/tags/${branch}:refs/tags/${branch}" --tags >/dev/null 2>&1
+    git fetch origin "refs/tags/${branch}:refs/tags/${branch}" >/dev/null 2>&1
     target_ref="refs/tags/${branch}"
   else
     if [[ "${branch}" == refs/* ]]; then
-      git fetch origin "${branch}" --tags
+      git fetch origin "${branch}"
       target_ref="FETCH_HEAD"
     else
       echo "Submodule ${name} ref ${branch} was not found as a remote branch or tag on ${url}."
