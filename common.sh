@@ -186,8 +186,14 @@ submodule_update() {
     git fetch origin "refs/tags/${branch}:refs/tags/${branch}" --tags >/dev/null 2>&1
     target_ref="refs/tags/${branch}"
   else
-    git fetch origin "${branch}" --tags
-    target_ref="FETCH_HEAD"
+    if [[ "${branch}" == refs/* ]]; then
+      git fetch origin "${branch}" --tags
+      target_ref="FETCH_HEAD"
+    else
+      echo "Submodule ${name} ref ${branch} was not found as a remote branch or tag on ${url}."
+      popd
+      return 1
+    fi
   fi
 
   git reset --hard "${target_ref}"
