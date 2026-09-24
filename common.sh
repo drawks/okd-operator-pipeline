@@ -171,13 +171,17 @@ submodule_update() {
 
   pushd "${name}"
   git remote set-url origin "${url}"
-  git fetch origin "${branch}" --tags
-
-  if git show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
-    target_ref="origin/${branch}"
-  elif git show-ref --verify --quiet "refs/tags/${branch}"; then
-    target_ref="refs/tags/${branch}"
+  if git fetch origin "${branch}:refs/remotes/origin/${branch}" --tags >/dev/null 2>&1; then
+    target_ref="refs/remotes/origin/${branch}"
   else
+    git fetch origin "${branch}" --tags
+  fi
+
+  if [ -z "${target_ref}" ] && git rev-parse --verify --quiet "refs/tags/${branch}^{commit}" >/dev/null; then
+    target_ref="refs/tags/${branch}"
+  fi
+
+  if [ -z "${target_ref}" ]; then
     target_ref="FETCH_HEAD"
   fi
 
